@@ -16,9 +16,10 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final ConfirmationRepository confirmationRepository;
     private final EmailService emailService;
+
     @Override
     public User saveUser(User user) {
-        if(userRepository.existsByEmail(user.getEmail())){
+        if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
         user.setStatus(false);
@@ -27,9 +28,11 @@ public class UserServiceImpl implements UserService {
         Confirmation confirmation = new Confirmation(user);
         confirmationRepository.save(confirmation);
 
-//        send email with token
-//    emailService.sendSimpleMailMessage(user.getFullName(), user.getEmail(), confirmation.getToken());
-        emailService.sendMimeMessageAttachments(user.getFullName(), user.getEmail(), confirmation.getToken());
+//      send email with token
+//      emailService.sendSimpleMailMessage(user.getFullName(), user.getEmail(), confirmation.getToken());
+//      emailService.sendMimeMessageAttachments(user.getFullName(), user.getEmail(), confirmation.getToken());
+        emailService.sendHtmlEmail(user.getFullName(), user.getEmail(), confirmation.getToken());
+
         return user;
     }
 

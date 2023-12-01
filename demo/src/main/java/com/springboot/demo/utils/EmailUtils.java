@@ -7,7 +7,7 @@ public class EmailUtils {
                 + getVerificationUrl(host, token) + "\nThis link verify account";
     }
 
-    private static String getVerificationUrl(String host, String token) {
+    public static String getVerificationUrl(String host, String token) {
         return host + "/api/sendmail?token=" + token;
     }
 }

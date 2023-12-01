@@ -13,14 +13,19 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.thymeleaf.ITemplateEngine;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
 
 import java.io.File;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
 public class EmailServiceImpl implements EmailService {
     public static final String VERIFY_ACCOUNT = "Verify Account";
     public static final String UTF_8_ENCODING = "UTF-8";
+    public static final String EMAIL_TEMPLATE = "emailTemplate";
     @Value("${spring.mail.verify.host}")
     private String host;
     @Value("${spring.mail.username}")
@@ -28,6 +33,7 @@ public class EmailServiceImpl implements EmailService {
 
     private final JavaMailSender emailSender;
     private final ResourceLoader resourceLoader;
+    private final TemplateEngine templateEngine;
 
     @Override
     @Async
@@ -50,7 +56,7 @@ public class EmailServiceImpl implements EmailService {
     public void sendMimeMessageAttachments(String name, String to, String token) {
         try {
             MimeMessage mimeMessage = getMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true , UTF_8_ENCODING);
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8_ENCODING);
             helper.setPriority(1);
             helper.setSubject(VERIFY_ACCOUNT);
             helper.setFrom(fromEmail);
@@ -58,41 +64,94 @@ public class EmailServiceImpl implements EmailService {
             helper.setText(EmailUtils.getEmailMessage(name, host, token));
             //Add attachments
             // Load resources using ResourceLoader
-            Resource image1Resource = resourceLoader.getResource("classpath:static/image_test_send_mail/image_1.jpg");
-            Resource image2Resource = resourceLoader.getResource("classpath:static/image_test_send_mail/image_2.jpg");
+            Resource resourceFrist = resourceLoader.getResource("classpath:static/image_test_send_mail/image_1.jpg");
+            Resource resourceSecond = resourceLoader.getResource("classpath:static/image_test_send_mail/image_2.jpg");
+            Resource resourceThird = resourceLoader.getResource("classpath:static/plan.pdf");
 
             // Convert Resource to File
-            File image1File = image1Resource.getFile();
-            File image2File = image2Resource.getFile();
+            File fileFirst = resourceFrist.getFile();
+            File fileSecond = resourceSecond.getFile();
+            File fileThird = resourceThird.getFile();
 
-            FileSystemResource image1 = new FileSystemResource(image1File);
-            FileSystemResource image2 = new FileSystemResource(image2File);
+            FileSystemResource fileSystemResourceFirst = new FileSystemResource(fileFirst);
+            FileSystemResource fileSystemResourceSecond = new FileSystemResource(fileSecond);
+            FileSystemResource fileSystemResourceThird = new FileSystemResource(fileThird);
 
-            helper.addAttachment(image1.getFilename(), image1);
-            helper.addAttachment(image2.getFilename(), image2);
+            helper.addAttachment(fileSystemResourceFirst.getFilename(),
+                    fileSystemResourceFirst);
+            helper.addAttachment(fileSystemResourceSecond.getFilename(),
+                    fileSystemResourceSecond);
+            helper.addAttachment(fileSystemResourceThird.getFilename(),
+                    fileSystemResourceThird);
+
             emailSender.send(mimeMessage);
-
         } catch (Exception exception) {
             System.out.println(exception.getMessage());
+            throw new RuntimeException(exception.getMessage());
         }
     }
 
     @Override
     @Async
     public void sendMimeMessageEmbeddedImages(String name, String to, String token) {
+        try {
+            MimeMessage mimeMessage = getMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8_ENCODING);
+            helper.setPriority(1);
+            helper.setSubject(VERIFY_ACCOUNT);
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setText(EmailUtils.getEmailMessage(name, host, token));
+            //Add attachments
+            // Load resources using ResourceLoader
+            Resource resourceFrist = resourceLoader.getResource("classpath:static/image_test_send_mail/image_1.jpg");
+            Resource resourceSecond = resourceLoader.getResource("classpath:static/image_test_send_mail/image_2.jpg");
+            Resource resourceThird = resourceLoader.getResource("classpath:static/plan.pdf");
 
+            // Convert Resource to File
+            File fileFirst = resourceFrist.getFile();
+            File fileSecond = resourceSecond.getFile();
+            File fileThird = resourceThird.getFile();
+
+            FileSystemResource fileSystemResourceFirst = new FileSystemResource(fileFirst);
+            FileSystemResource fileSystemResourceSecond = new FileSystemResource(fileSecond);
+            FileSystemResource fileSystemResourceThird = new FileSystemResource(fileThird);
+
+            helper.addInline(getContentId(fileSystemResourceFirst.getFilename()),
+                    fileSystemResourceFirst);
+            helper.addInline(getContentId(fileSystemResourceSecond.getFilename()),
+                    fileSystemResourceSecond);
+            helper.addInline(getContentId(fileSystemResourceThird.getFilename()),
+                    fileSystemResourceThird);
+
+            emailSender.send(mimeMessage);
+        } catch (Exception exception) {
+            System.out.println(exception.getMessage());
+            throw new RuntimeException(exception.getMessage());
+        }
     }
 
-    @Override
-    @Async
-    public void sendMimeMessageEmbeddedFiles(String name, String to, String token) {
-
-    }
 
     @Override
     @Async
     public void sendHtmlEmail(String name, String to, String token) {
+        try {
+            Context context = new Context();
+            context.setVariables(Map.of("name", name, "url", EmailUtils.getVerificationUrl(host, token)));
+            String text = templateEngine.process(EMAIL_TEMPLATE, context);
+            MimeMessage mimeMessage = getMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, UTF_8_ENCODING);
+            helper.setPriority(1);
+            helper.setSubject(VERIFY_ACCOUNT);
+            helper.setFrom(fromEmail);
+            helper.setTo(to);
+            helper.setText(text, true);
 
+            emailSender.send(mimeMessage);
+        } catch (Exception exception) {
+            System.out.println(exception.getMessage());
+            throw new RuntimeException(exception.getMessage());
+        }
     }
 
     @Override
@@ -103,5 +162,9 @@ public class EmailServiceImpl implements EmailService {
 
     private MimeMessage getMimeMessage() {
         return emailSender.createMimeMessage();
+    }
+
+    private String getContentId(String filename) {
+        return "<" + filename + ">";
     }
 }
